@@ -1,0 +1,163 @@
+# SAVER 서비스 연동을 위한 템플릿
+
+이 저장소는 [SAVER 서비스](https://saver.hufstech.com)에 본인의 검색엔진을 쉽게 연결하는 것을 돕고자 만들어졌습니다. 개발자는 각자 자기 Github로 가져가서 사용할 수 있는 템플릿을 이용해 본인의 코드를 쉽게 통합할 수 있습니다.
+
+![github](img.png)
+
+## 요약
+
+* 본인의 검색엔진 코드를 통합하려면 이 템플릿의 기본 골격을 수정해야 한다. 검색엔진 코드는 `router.py`의 `search_work`에, 검색엔진의 데이터 반환 형식은 `model.py`의 `SearchResponse`에 작성한다.
+* 외부 API을 사용해야 할 때, 요청 처리는 두 갈래로 나뉜다: 사용자가 요청할 때 보내기, 사용자 요청과 상관없이 보내기. 전자는 `router.py`의 `search_work`에 나와있듯이 호출하고, 후자는 `app.py`의 `lifespan`에 나와있듯이 주기 작업을 등록하면 된다. 상세 호출 코드는 `external_api.py`에서 확인할 수 있다.
+* 비밀값을 포함할 때는 코드에 직접 넣지 않고, `.env` 파일을 만든 뒤 app.py에서 이를 불러와야 한다:
+```dotenv
+# .env
+THIS_IS_SECRET=dhjkfahdskfaldhs
+```
+
+```python
+# lifespan 함수 안에서
+secret = os.getenv("THIS_IS_SECRET")
+```
+
+## 실행 환경 구축
+
+```shell
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+아래 명령이 성공해야 합니다. README.md와 동일한 디렉토리 위치에서 실행해야 합니다.
+
+```shell
+uvicorn main:app --reload --host 0.0.0.0 --port 5055
+```
+
+브라우저에서 접속할 수 있는지 확인합니다: http://localhost:5055
+
+![browser](img_1.png)
+
+데이터베이스 연결은 현재 주석 처리되어 있습니다. 데이터베이스가 필요한 경우 `src/app.py`에서 주석을 해제하시면 됩니다.
+
+```python
+    # pg_host = os.getenv("PG_HOST", "localhost")
+    # pg_port = int(os.getenv("PG_PORT", "5432"))
+    # pg_user = os.getenv("PG_USER", "saver")
+    # pg_password = os.getenv("PG_PASSWORD", "saver")
+    # pg_database = os.getenv("PG_DATABASE", "saverdb")
+    # pool = await asyncpg.create_pool(
+    #     user=pg_user,
+    #     password=pg_password,
+    #     database=pg_database,
+    #     host=pg_host,
+    #     port=pg_port,
+    # )
+    # app.state.pool = pool
+    #
+    # redis_client = Redis(
+    #     host=os.getenv("REDIS_HOST", "localhost"),
+    #     port=int(os.getenv("REDIS_PORT", "6379")),
+    #     db=int(os.getenv("REDIS_DB", "0")),
+    #     password=os.getenv("REDIS_PASSWORD"),
+    #     decode_responses=True,
+    #     socket_connect_timeout=5,
+    #     socket_timeout=5,
+    # )
+    # await redis_client.ping()
+    # app.state.redis = redis_client
+```
+
+<details>
+
+<summary>참고: 데이터베이스 실행하기</summary>
+
+```shell
+docker run --rm --name postgresql -p 5432:5432 -d --env POSTGRES_USER=saver --env POSTGRES_PASSWORD=saver --env POSTGRES_DB=saverdb postgres:16
+```
+
+```shell
+docker run --rm --name valkey -d -p 6379:6379 docker.io/valkey/valkey:9-alpine;
+```
+
+</details>
+
+## 검색 요청과 응답
+
+```text
+| src/
+|   | app.py
+|   | external_api.py
+|   | model.py
+|   | router.py
+```
+
+| 파일 이름 | 하는 역할 |
+| --- | --- |
+| app.py | FastAPI 실행을 위한 진입점 역할입니다. DB 연결 등의 코드가 있습니다. |
+| external_api.py | 외부 API를 불러야 하는 상황에서 사용하는 httpx 라이브러리 코드 예시가 있습니다. |
+| model.py | 단순히 json 원문으로 요청과 응답을 관리하면 유지보수성이 떨어집니다. Pydantic을 사용해서 요청과 응답 객체를 관리할 수 있으며, 그 기본 선언이 들어 있습니다. |
+| router.py | 검색 작업을 처리하는 실제 코드가 들어 있습니다. |
+
+router.py를 보면 `/search/work`라는 경로 처리 함수가 있습니다. 이 함수에 여러분의 검색엔진 코드를 넣으면 됩니다.
+
+```python
+@router.post("/work",
+             response_model_by_alias=True,
+             response_model=SearchResponse,
+             status_code=status.HTTP_200_OK,
+             summary="검색 작업",
+             description=(
+                     "사용자로부터 검색어를 입력받아 검색 작업 수행 후, 그 결과를 반환합니다."
+             ),
+             responses={
+                 200: {"description": "검색 결과가 반환됨"},
+                 422: {"description": "요청이 SearchRequest 형식으로 오지 않음"},
+             },
+             )
+async def search_work(request: Request, search_request: SearchRequest):
+    # 여기에 검색엔진 코드를 넣으세요.
+    app = request.app  # app.state를 사용할 수 있게 해줍니다.
+    external_api_response = await src.external_api.get_external_api(search_request) # 필요에 따라 사용하세요.
+    return SearchResponse(**external_api_response)
+```
+
+* request 매개변수는 사용자 요청 원문을 담고 있을 뿐만 아니라, FastAPI app 객체를 사용할 수 있게 해줍니다. app.py에서 선언되는 app에는 DB를 포함해 다양한 코드를 포함할 수 있습니다.
+* search_request 매개변수는 `saver.hufstech.com` 프론트엔드가 보내는 검색어 요청 객체입니다. 상세한 선언은 model.py에서 확인할 수 있습니다.
+* 지금 예제에서는 get_external_api 함수에 요청을 보낸 후 그 결과로 얻은 json을 SearchResponse로 변환하여 사용자에게 전달하고 있습니다(json 응답을 예측가능하게 해주는 게 Pydantic의 역할이므로, get_external_api이 반환하는 json의 형태가 달라진다면 **SearchResponse도 반드시 수정해야 합니다**). 그렇다면 get_external_api 함수를 살펴보겠습니다.
+
+```python
+async def get_external_api(search_request: SearchRequest):
+    """
+    외부 API를 호출 할 때 사용하는 예시 코드입니다.
+    """
+    print(search_request)
+    async with httpx.AsyncClient() as client:
+        response = await client.get("https://saverapi.hufstech.com/") # 본인이 사용하는 API로 교체해야 합니다.
+        response.raise_for_status() # API 호출에서 오류가 발생하면 get_external_api를 호출하는 라우터에서도 예외 처리가 발생합니다.
+        return response.json()
+```
+
+* 검색엔진 중에 외부로 요청을 보내야 할 수도 있습니다. 이때 외부 API에 요청을 보내고 관리하는 Python 패키지가 `httpx`입니다. 이 함수는 현재 `saverapi.hufstech.com`로 요청을 보내고, 만약 실패하면 예외를 발생시키거나 성공하면 json을 반환합니다.
+* 현재는 API 호출에 실패할 때 매우 간단하게만 처리하고 있습니다. `raise_for_status`는 편리하지만, 재요청이나 다른 방법으로 해결할 수 있을 때에도 검색 요청을 실패시키기에 주의가 필요합니다.
+* 만약 API 호출에 비밀키가 필요한 경우, app.py에서 app 객체에 환경변수를 담는 예제가 있습니다. **절대로 코드에 비밀키를 포함하지 말고**, 이를 이용해야 합니다.
+
+한편 사용자 요청과 별개로 API 요청을 보내고 싶을 수 있습니다. 이때는 Python에서 기본으로 지원하는 `asyncio`를 사용할 수 있습니다. 그 예제는 app.py에 있습니다.
+
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 백그라운드 태스크를 시작합니다.
+    task = asyncio.create_task(periodic_task())
+    
+    yield # 여기 이후로 FastAPI가 종료된다고 보면 됩니다.
+    
+    # 앱 종료 시 백그라운드 태스크를 취소합니다.
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+```
+
+* periodic_task 함수는 external_api.py에 있으며 앞선 예시와 크게 다르지 않습니다. 마찬가지로 본인이 사용하는 API를 호출하도록 변경해야 합니다.
+* lifespan 함수는 FastAPI 애플리케이션의 전체 수명 주기를 관리합니다. yield 키워드 전에는 FastAPI가 시작하기 전에 할 일, 후에는 FastAPI가 종료되고 나서 할 일을 작성합니다. 프로그램이 종료되었으므로 asyncio로 예약한 periodic_task 작업도 취소해야 합니다.
