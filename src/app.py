@@ -7,6 +7,7 @@ import dotenv
 from contextlib import asynccontextmanager
 import pathlib
 import asyncio
+import os
 from src.router import router
 from src.external_api import periodic_task
 
@@ -50,6 +51,10 @@ async def lifespan(app: FastAPI):
         await task
     except asyncio.CancelledError:
         pass
+
+    # 데이터베이스 연결을 활성화했다면 종료 코드도 함께 주석 해제하세요.
+    # await app.state.redis.aclose()
+    # await app.state.pool.close()
 
 
 app = FastAPI(

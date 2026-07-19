@@ -116,6 +116,13 @@ uvicorn main:app --reload --host 0.0.0.0 --port 5055
     # app.state.redis = redis_client
 ```
 
+연결을 활성화했다면 `lifespan` 아래쪽의 연결 종료 코드도 함께 주석 해제해야 합니다.
+
+`src/router.py`에는 연결을 실제로 사용하는 다음 엔드포인트 예제가 주석 처리되어 있습니다. 필요한 데이터베이스의 연결 코드와 해당 엔드포인트를 함께 주석 해제해서 사용할 수 있습니다.
+
+* `POST /search/postgresql-example/{query}`: 예제 테이블을 만들고 검색어 한 건을 저장한 뒤 저장된 행을 반환합니다.
+* `PUT /search/redis-example/{key}?value=...`: 값을 5분 동안 저장한 뒤 다시 조회해 반환합니다.
+
 <details>
 
 <summary>참고: 데이터베이스 실행하기</summary>
