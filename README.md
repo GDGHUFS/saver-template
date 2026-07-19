@@ -6,6 +6,53 @@
 
 ## 요약
 
+```mermaid
+flowchart LR
+    %% Frontend 영역
+    subgraph CLIENT["Client"]
+        FE["Frontend<br/>검색창 · 결과 화면 · 서비스 UI"]
+    end
+
+    %% 통합 서비스 영역
+    subgraph SERVICE["Main Service"]
+        BE["Backend<br/>인증 · 요청 처리 · 결과 통합"]
+        BDB[("Main Database<br/>사용자 · 권한 · 서비스 데이터")]
+
+        BE <--> BDB
+    end
+
+    %% 특수 검색엔진 영역
+    subgraph SEARCH["Custom Search Engines"]
+        SE1["Your Search Engine"]
+        SE2["Your Search Engine"]
+        SE3["Your Search Engine"]
+        SEN["Your Search Engine"]
+
+        DB1[("Your Search DB(색인 데이터)")]
+        DB2[("Your Search DB(색인 데이터)")]
+        DB3[("Your Search DB(색인 데이터)")]
+        DBN[("Your Search DB(색인 데이터)")]
+
+        SE1 <--> DB1
+        SE2 <--> DB2
+        SE3 <--> DB3
+        SEN <--> DBN
+    end
+
+    FE <-->|Main Service API| BE
+
+    BE <-->|"Resource(news, holiday, ...) API"| SE1
+    BE <-->|"Resource(news, holiday, ...) API"| SE2
+    BE <-->|"Resource(news, holiday, ...) API"| SE3
+    BE <-->|"Resource(news, holiday, ...) API"| SEN
+
+    FE <-->|Search API| SE1
+    FE <-->|Search API| SE2
+    FE <-->|Search API| SE3
+    FE <-->|Search API| SEN
+```
+
+* 프론트엔드와 본인의 검색엔진이 직접 소통하는 아키텍처로 개발.
 * 본인의 검색엔진 코드를 통합하려면 이 템플릿의 기본 골격을 수정해야 한다. 검색엔진 코드는 `router.py`의 `search_work`에, 검색엔진의 데이터 반환 형식은 `model.py`의 `SearchResponse`에 작성한다.
 * 외부 API을 사용해야 할 때, 요청 처리는 두 갈래로 나뉜다: 사용자가 요청할 때 보내기, 사용자 요청과 상관없이 보내기. 전자는 `router.py`의 `search_work`에 나와있듯이 호출하고, 후자는 `app.py`의 `lifespan`에 나와있듯이 주기 작업을 등록하면 된다. 상세 호출 코드는 `external_api.py`에서 확인할 수 있다.
 * 비밀값을 포함할 때는 코드에 직접 넣지 않고, `.env` 파일을 만든 뒤 app.py에서 이를 불러와야 한다:
