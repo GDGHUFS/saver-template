@@ -83,6 +83,9 @@ docker run --rm --name valkey -d -p 6379:6379 docker.io/valkey/valkey:9-alpine;
 
 ## 검색 요청과 응답
 
+> [!NOTE]
+> 이 과정에서는 Pydantic, HTTPX를 비롯한 Python 외부 패키지 사용 코드가 들어있습니다. 이들 패키지 사용설명서는 [https://knowledge.opensource.ai.kr/s/saver/p/python-yZvdwO4DlX](https://knowledge.opensource.ai.kr/s/saver/p/python-yZvdwO4DlX)를 참고하세요.
+
 ```text
 | src/
 |   | app.py
