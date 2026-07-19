@@ -35,6 +35,8 @@ uvicorn main:app --reload --host 0.0.0.0 --port 5055
 
 브라우저에서 접속할 수 있는지 확인합니다: http://localhost:5055
 
+본인의 애플리케이션을 테스트하려면 [http://localhost:5055/docs](http://localhost:5055/docs)로 접속하면 됩니다.
+
 ![browser](img_1.png)
 
 데이터베이스 연결은 현재 주석 처리되어 있습니다. 데이터베이스가 필요한 경우 `src/app.py`에서 주석을 해제하시면 됩니다.
