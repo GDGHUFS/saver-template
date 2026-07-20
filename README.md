@@ -66,7 +66,42 @@ THIS_IS_SECRET=dhjkfahdskfaldhs
 secret = os.getenv("THIS_IS_SECRET")
 ```
 
-## 실행 환경 구축
+## Docker Compose로 실행
+
+기본 Compose 구성은 애플리케이션만 실행합니다. 기본 설정을 바꾸려면 예제 환경 변수 파일을 복사한 뒤 값을 수정합니다.
+
+```shell
+cp .env.example .env
+podman compose -f compose.yaml up --build
+```
+
+Docker를 사용하는 경우 두 번째 명령을 `docker compose -f compose.yaml up --build`로 바꾸면 됩니다. 컨테이너가 시작되면 [http://localhost:5055](http://localhost:5055)와 API 문서(`/docs`)를 사용할 수 있습니다. 이미 사용 중인 포트가 있다면 `.env`의 `APP_PORT`를 변경합니다.
+
+실행을 종료할 때는 다음 명령을 사용합니다.
+
+```shell
+podman compose -f compose.yaml down
+```
+
+### PostgreSQL과 Valkey 예제 사용
+
+`compose.yaml`에는 실제 실행과 healthcheck를 확인한 PostgreSQL과 Valkey 구성이 주석으로 들어 있습니다. 데이터베이스가 필요한 개발자는 다음 부분을 직접 주석 해제해야 합니다.
+
+1. `compose.yaml`의 앱 환경 변수와 필요한 `depends_on` 항목
+2. `compose.yaml`의 `postgres`, `valkey` 서비스와 해당 볼륨
+3. `src/app.py`의 필요한 데이터베이스 연결 및 종료 코드
+4. `src/router.py`의 해당 예제 엔드포인트
+
+PostgreSQL과 Valkey의 호스트 포트는 보안을 위해 `127.0.0.1`에만 공개되도록 작성되어 있습니다. 포트가 이미 사용 중이면 `.env`의 `POSTGRES_HOST_PORT` 또는 `VALKEY_HOST_PORT`를 변경합니다. 이름 있는 볼륨까지 삭제하려면 종료 명령에 `--volumes`를 추가하며, 이 경우 저장된 데이터도 삭제됩니다.
+
+주석을 해제한 뒤 다음 API로 연결을 확인할 수 있습니다.
+
+```shell
+curl -X POST http://localhost:5055/search/postgresql-example/podman
+curl -X PUT 'http://localhost:5055/search/redis-example/greeting?value=hello'
+```
+
+## Python으로 직접 실행
 
 ```shell
 python3 -m venv venv
@@ -77,7 +112,7 @@ pip install -r requirements.txt
 아래 명령이 성공해야 합니다. README.md와 동일한 디렉토리 위치에서 실행해야 합니다.
 
 ```shell
-uvicorn main:app --reload --host 0.0.0.0 --port 5055
+uvicorn src.app:app --reload --host 0.0.0.0 --port 5055
 ```
 
 브라우저에서 접속할 수 있는지 확인합니다: http://localhost:5055
@@ -86,56 +121,10 @@ uvicorn main:app --reload --host 0.0.0.0 --port 5055
 
 ![browser](img_1.png)
 
-데이터베이스 연결은 현재 주석 처리되어 있습니다. 데이터베이스가 필요한 경우 `src/app.py`에서 주석을 해제하시면 됩니다.
-
-```python
-    # pg_host = os.getenv("PG_HOST", "localhost")
-    # pg_port = int(os.getenv("PG_PORT", "5432"))
-    # pg_user = os.getenv("PG_USER", "saver")
-    # pg_password = os.getenv("PG_PASSWORD", "saver")
-    # pg_database = os.getenv("PG_DATABASE", "saverdb")
-    # pool = await asyncpg.create_pool(
-    #     user=pg_user,
-    #     password=pg_password,
-    #     database=pg_database,
-    #     host=pg_host,
-    #     port=pg_port,
-    # )
-    # app.state.pool = pool
-    #
-    # redis_client = Redis(
-    #     host=os.getenv("REDIS_HOST", "localhost"),
-    #     port=int(os.getenv("REDIS_PORT", "6379")),
-    #     db=int(os.getenv("REDIS_DB", "0")),
-    #     password=os.getenv("REDIS_PASSWORD"),
-    #     decode_responses=True,
-    #     socket_connect_timeout=5,
-    #     socket_timeout=5,
-    # )
-    # await redis_client.ping()
-    # app.state.redis = redis_client
-```
-
-연결을 활성화했다면 `lifespan` 아래쪽의 연결 종료 코드도 함께 주석 해제해야 합니다.
-
-`src/router.py`에는 연결을 실제로 사용하는 다음 엔드포인트 예제가 주석 처리되어 있습니다. 필요한 데이터베이스의 연결 코드와 해당 엔드포인트를 함께 주석 해제해서 사용할 수 있습니다.
+데이터베이스 연결은 현재 주석 처리되어 있습니다. 데이터베이스가 필요한 경우 `src/app.py`의 연결 및 종료 코드와 `src/router.py`의 해당 예제 엔드포인트를 함께 주석 해제해서 사용합니다.
 
 * `POST /search/postgresql-example/{query}`: 예제 테이블을 만들고 검색어 한 건을 저장한 뒤 저장된 행을 반환합니다.
-* `PUT /search/redis-example/{key}?value=...`: 값을 5분 동안 저장한 뒤 다시 조회해 반환합니다.
-
-<details>
-
-<summary>참고: 데이터베이스 실행하기</summary>
-
-```shell
-docker run --rm --name postgresql -p 5432:5432 -d --env POSTGRES_USER=saver --env POSTGRES_PASSWORD=saver --env POSTGRES_DB=saverdb postgres:16
-```
-
-```shell
-docker run --rm --name valkey -d -p 6379:6379 docker.io/valkey/valkey:9-alpine;
-```
-
-</details>
+* `PUT /search/redis-example/{key}?value=...`: Valkey(Redis 호환)에 값을 5분 동안 저장한 뒤 다시 조회해 반환합니다.
 
 ## 검색 요청과 응답
 
