@@ -8,13 +8,8 @@ WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir --requirement requirements.txt
 
-RUN addgroup --system saver \
-    && adduser --system --ingroup saver saver
-
-COPY --chown=saver:saver src ./src
-COPY --chown=saver:saver wellcome.html ./
-
-USER saver
+COPY src ./src
+COPY wellcome.html ./
 
 EXPOSE 5055
 
