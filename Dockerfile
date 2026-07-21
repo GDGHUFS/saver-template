@@ -1,13 +1,20 @@
-FROM python:3.11-slim
+FROM docker.io/library/python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
 COPY requirements.txt ./
+RUN pip install --no-cache-dir --requirement requirements.txt
 
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN addgroup --system saver \
+    && adduser --system --ingroup saver saver
 
-COPY . .
+COPY --chown=saver:saver src ./src
+COPY --chown=saver:saver wellcome.html ./
+
+USER saver
 
 EXPOSE 5055
 
